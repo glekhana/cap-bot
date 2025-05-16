@@ -72,7 +72,21 @@ def check_duplicates_async(user_id, channel_id, message_ts, response_url):
         #TODO  exclude conversations from incentives bot
         # Generate only the title using AI
         # Format the conversation for the API
-        conversation_text = "\n".join([f"{msg.get('username', 'User')}: {msg.get('text', '')}" for msg in messages])
+        conversation_text = ""
+        for msg in messages:
+            # Get user info
+            user_info = client.users_info(user=msg.get("user", "unknown"))
+            username = user_info["user"]["real_name"] if user_info.get("ok") else "Unknown User"
+
+            # Skip messages from Incentives-Bot
+            if "cap-bot" in username.lower() or "Cap Bot" in username.lower():
+                continue
+
+            # Also check if the message is from a bot with the name containing "incentives"
+            if msg.get("bot_id") and msg.get("username") and "cap" in msg.get("username", "").lower():
+                continue
+
+            conversation_text = "\n".join(f"{msg.get('username', 'User')}: {msg.get('text', '')}")
 
         # Get title and suggested priority, but don't generate summary yet
         result = generate_from_thread_ticket_parameters(conversation_text)

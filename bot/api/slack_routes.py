@@ -8,7 +8,8 @@ from flask import request, jsonify
 from bot.config.settings import (
     SLACK_BOT_TOKEN, SLACK_SIGNING_SECRET, COMPONENT_SEARCH_URL, REPOS, JIRA_PROJECT_KEY
 )
-from bot.handlers.event_handlers import handle_ticket_modal_submission, create_thread_to_ticket_async
+from bot.handlers.event_handlers import handle_ticket_modal_submission, create_thread_to_ticket_async, \
+    register_issue_update,register_comment_update
 from bot.handlers.ticket_handlers import (
     handle_thread_to_ticket_async, show_ticket_creation_form
 )
@@ -17,8 +18,6 @@ from bot.models.updateData import index_issue
 from bot.utils.jira_helpers import get_project_components, get_jira_projects
 from slack_sdk import WebClient
 from slack_sdk.signature import SignatureVerifier
-
-from bot.utils.slack_helpers import update_slack_status
 
 # Initialize Slack clients
 client = WebClient(token=SLACK_BOT_TOKEN)
@@ -148,7 +147,7 @@ def register_slack_routes(app):
 
         return jsonify({"text": "Unknown command."})
     
-    @app.route("/slack/get_components", methods=["POST"])
+    @app.route("/slack/menus", methods=["POST"])
     def get_components():
         """
         Handle external data source for component selection.
@@ -563,7 +562,7 @@ def register_slack_routes(app):
     def update_status_endpoint():
         try:
             data = request.json
-            update_slack_status(client,data)
+            register_issue_update(client, data)
             return jsonify({
                 'success': True,
                 'message': f'Successfully updated status'
@@ -627,6 +626,36 @@ def register_slack_routes(app):
                     'error': f'Failed to add issue {issue_info["key"]}'
                 }), 500
 
+        except Exception as e:
+            return jsonify({
+                'success': False,
+                'error': str(e)
+            }), 500
+
+    @app.route('/update-comment', methods=['POST'])
+    def update_comment_endpoint():
+        try:
+            data = request.json
+            register_comment_update(data)
+            return jsonify({
+                'success': True,
+                'message': f'Successfully updated status'
+            }), 200
+        except Exception as e:
+            return jsonify({
+                'success': False,
+                'error': str(e)
+            }), 500
+
+    @app.route('/update-comment', methods=['POST'])
+    def update_comment_endpoint():
+        try:
+            data = request.json
+            register_comment_update(data)
+            return jsonify({
+                'success': True,
+                'message': f'Successfully updated status'
+            }), 200
         except Exception as e:
             return jsonify({
                 'success': False,

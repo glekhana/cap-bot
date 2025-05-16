@@ -1,6 +1,8 @@
 
 import json
+import re
 import threading
+from xml.etree.ElementTree import tostring
 
 import requests
 from bot.handlers.ticket_handlers import create_jira_ticket
@@ -185,3 +187,95 @@ def link_jira_tickets(source_ticket, target_tickets):
 
         except Exception as e:
             print(f"Error linking ticket {source_ticket} to {target}: {e}")
+
+
+def register_issue_update(client, issue):
+    """
+    Update status on slack thread based on Jira issue status
+
+    Args:
+        issue (dict): Jira issue data
+    """
+    # Check if changelog items contain status field
+    has_status_change = False
+    has_assignee_changed = False
+    assignee_name = ""
+    for item in issue["changelog"]["items"]:
+        if item["field"] == "status":
+            has_status_change = True
+            break
+        if item["field"] ==  "assignee":
+            assignee_name = item['toString']
+            if assignee_name is not None:
+                has_assignee_changed = True
+            break
+        if item["field"] == "description" or item["field"] == "summary":
+            newChange = item["toString"]
+            has_details_change = True
+            break
+    has_details_change = False
+    for item in issue["changelog"]["items"]:
+        #TODO: Confirm this condition for title and description
+        if item["field"] == "description" or item["field"] == "summary":
+            has_details_change = True
+            break
+
+    if not has_status_change and not has_details_change and not has_assignee_changed:
+        return
+        # Extract required fields
+    user_display_name = issue["user"]["displayName"]
+    slack_channel_id = issue["issue"]["fields"]["customfield_10038"]
+    slack_thread_ts = issue["issue"]["fields"]["customfield_10039"]
+    issue_key = issue["issue"]["key"]
+    status = issue["issue"]["fields"]["status"]["name"]
+    if re.match(r'^NBP-\d+$', issue_key):
+        url = f"{JIRA_ISSUE_URL}/{issue_key}"
+    else:
+        url = f"{SOURCE_JIRA_ISSUE_URL}/{issue_key}"
+
+    # Check if slack fields are empty or null
+    if not slack_channel_id or not slack_thread_ts:
+        return
+    if has_status_change:
+
+        # Print the extracted information
+        print(f"User: {user_display_name}")
+        print(f"Slack Channel ID: {slack_channel_id}")
+        print(f"Slack Thread TS: {slack_thread_ts}")
+        print(f"Issue Key: {issue_key}")
+        print(f"Status: {status}")
+
+        if status=="Done":
+            client.chat_postMessage(
+                channel=slack_channel_id,
+                thread_ts=slack_thread_ts,
+                text=f"✅ There is an update on <{url} | {issue_key}>\n>Status: *{status}*\n>By: *{user_display_name}*"
+            )
+        else:
+            client.chat_postMessage(
+                channel=slack_channel_id,
+                thread_ts=slack_thread_ts,
+                text=f"🤖 There is an update on <{url} | {issue_key}> \n> Status: *{status}*\n> By: *{user_display_name}*"
+            )
+    elif has_assignee_changed:
+        client.chat_postMessage(
+            channel=slack_channel_id,
+            thread_ts=slack_thread_ts,
+            text=f"🤖 There is an update on <{url} | {issue_key}> \n> Assigned to: *{assignee_name}*\n>"
+        )
+
+
+    else:
+        #TODO
+        raise Exception("Implement embedding & summary update")
+
+def register_comment_update(issue):
+    """
+    Update status on slack thread based on Jira issue status
+
+    Args:
+        issue (dict): Jira issue data
+    """
+    # Check if changelog items contain status field
+    #TODO: Extract key, summary & description from req -> use key to fetch all comments -> update summary in DB
+    print(issue)

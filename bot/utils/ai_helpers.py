@@ -325,6 +325,7 @@ def summarize_duplicate_issues(title, summary, description, duplicates):
         - Structure your response clearly with appropriate formatting and line breaks.
         - Avoid generic summaries; ground all conclusions in the provided data.
         - Do not mention any issues that don't match with the current issue.
+        - Do not mention any issues that are relevant to the current issue. Skip the ticket if it has not given you valuable information.
 
         Respond strictly in the following JSON format:
 
