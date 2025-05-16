@@ -15,6 +15,7 @@ from bot.handlers.ticket_handlers import (
 )
 from bot.handlers.release_handlers import handle_submission_async
 from bot.models.updateData import index_issue
+from bot.utils.ai_helpers import generate_summary_from_ticket
 from bot.utils.jira_helpers import get_project_components, get_jira_projects
 from slack_sdk import WebClient
 from slack_sdk.signature import SignatureVerifier
@@ -612,6 +613,8 @@ def register_slack_routes(app):
                 }), 400
 
             print(issue_info)
+            generated_summary = generate_summary_from_ticket(issue_info["summary"],issue_info["description"])
+            issue_info["generated_summary"] = generated_summary
             # Call add_issue function
             success = index_issue(issue_info)
 
@@ -647,17 +650,3 @@ def register_slack_routes(app):
                 'error': str(e)
             }), 500
 
-    @app.route('/update-comment', methods=['POST'])
-    def update_comment_endpoint():
-        try:
-            data = request.json
-            register_comment_update(data)
-            return jsonify({
-                'success': True,
-                'message': f'Successfully updated status'
-            }), 200
-        except Exception as e:
-            return jsonify({
-                'success': False,
-                'error': str(e)
-            }), 500

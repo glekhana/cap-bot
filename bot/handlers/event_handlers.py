@@ -6,8 +6,12 @@ from xml.etree.ElementTree import tostring
 
 import requests
 from bot.handlers.ticket_handlers import create_jira_ticket
+from bot.models.updateData import update_all_issue_data, update_generated_summary
+from bot.utils.ai_helpers import generate_summary_from_ticket
+from bot.utils.dbHelper import fetch_description_title
+from bot.utils.formatters import format_comments
 from bot.utils.jira_formatters import create_summary_adf_document
-from bot.utils.jira_helpers import extract_jira_tickets, upload_files_to_jira
+from bot.utils.jira_helpers import extract_jira_tickets, upload_files_to_jira, get_issue_comments
 from bot.utils.slack_helpers import get_full_thread_messages
 from bot.config.settings import (
     SLACK_BOT_TOKEN, SOURCE_JIRA_PROJECT_KEY, SOURCE_JIRA_ISSUE_URL,
@@ -199,26 +203,24 @@ def register_issue_update(client, issue):
     # Check if changelog items contain status field
     has_status_change = False
     has_assignee_changed = False
+    has_details_change = False
     assignee_name = ""
+    field =""
     for item in issue["changelog"]["items"]:
-        if item["field"] == "status":
+        field = item["field"]
+        if field == "status":
             has_status_change = True
             break
-        if item["field"] ==  "assignee":
+        if field ==  "assignee":
             assignee_name = item['toString']
             if assignee_name is not None:
                 has_assignee_changed = True
             break
-        if item["field"] == "description" or item["field"] == "summary":
+        if field == "description" or item["field"] == "summary":
             newChange = item["toString"]
             has_details_change = True
             break
-    has_details_change = False
-    for item in issue["changelog"]["items"]:
-        #TODO: Confirm this condition for title and description
-        if item["field"] == "description" or item["field"] == "summary":
-            has_details_change = True
-            break
+
 
     if not has_status_change and not has_details_change and not has_assignee_changed:
         return
@@ -266,7 +268,17 @@ def register_issue_update(client, issue):
 
 
     else:
-        #TODO
+        comments = get_issue_comments(issue_key)
+        comments_text = format_comments(comments)
+
+        generated_summary = generate_summary_from_ticket(issue['issue']["fields"]["summary"],issue['issue']["fields"]["description"],comments_text)
+        issue_data = {
+           "issue_key" :issue_key,
+            "summary" :issue['issue']["fields"]["summary"],
+            "description" : issue['issue']["fields"]["description"],
+            "generated_summary" : generated_summary
+        }
+        update_all_issue_data(issue_data)
         raise Exception("Implement embedding & summary update")
 
 def register_comment_update(issue):
@@ -276,6 +288,18 @@ def register_comment_update(issue):
     Args:
         issue (dict): Jira issue data
     """
-    # Check if changelog items contain status field
-    #TODO: Extract key, summary & description from req -> use key to fetch all comments -> update summary in DB
-    print(issue)
+
+
+    issue_key = issue["issue"]["key"]
+    comments = get_issue_comments(issue_key)
+    comments_text = format_comments(comments)
+
+    ticket_id, summary, description, issue_key = fetch_description_title(issue_key)
+    generated_summary = generate_summary_from_ticket(summary,
+                                                     description, comments_text)
+    issue_data = {
+        "issue_key": issue_key,
+        "generated_summary": generated_summary
+    }
+    update_generated_summary(issue_data)
+

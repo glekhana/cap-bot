@@ -6,6 +6,10 @@ from flask import Flask
 from dotenv import load_dotenv
 import openai
 from waitress import serve
+from presidio_analyzer import AnalyzerEngine, RecognizerRegistry
+from presidio_analyzer.nlp_engine import NlpEngineProvider
+from presidio_anonymizer import AnonymizerEngine
+
 
 from bot.config.settings import (
     SLACK_BOT_TOKEN, SLACK_SIGNING_SECRET, OPENAI_API_KEY,
@@ -13,7 +17,8 @@ from bot.config.settings import (
 )
 from bot.api.slack_routes import register_slack_routes
 
-# Initialize Flask bot
+
+
 app = Flask(__name__)
 
 # Configure OpenAI

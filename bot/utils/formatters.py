@@ -1,3 +1,6 @@
+import math
+import re
+
 def format_comments(ticket_comments):
     """
     Format JIRA comments by extracting text from Atlassian Document Format (ADF).
@@ -80,3 +83,10 @@ def extract_text_from_nodes(nodes):
             extracted_text += '\n'
             
     return extracted_text
+def trim_float(value, decimals=3):
+    percent = value * 100
+    return f"{percent:.{decimals}f}%"
+
+
+def replace_double_with_single_asterisks(text):
+    return re.sub(r'\*\*(.*?)\*\*', r'*\1*', text)

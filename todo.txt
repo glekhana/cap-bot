@@ -1,10 +1,10 @@
 1. upload & curl & labels as list & components as list & Brand in pop up & Environment
-2. update add index when to generate summary and store as generated summary
-3. update comment method
+2. update add index when to generate summary and store as generated summary - done
+3. update comment method and update title description
 4. backfill script
 5. take DB backup
-6. Beautify analysis and possible messages in slack ( reduce content, bullet the content, bold the keys in analysis)
-7. Add match score for each duplicate
+6. Beautify analysis and possible messages in slack ( reduce content, bullet the content, bold the keys in analysis) - done
+7. Add match score for each duplicate - done
 8. PII data
 9. Video
 10. Doc

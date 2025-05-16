@@ -11,6 +11,7 @@ from bot.config.settings import (
     JIRA_URL, JIRA_USER, JIRA_API_TOKEN, JIRA_ISSUE_URL, JIRA_PROJECT_KEY
 )
 from bot.models.search import search_issues_via_proc
+from bot.utils.formatters import trim_float, replace_double_with_single_asterisks
 from bot.utils.slack_helpers import get_thread_messages
 from bot.utils.jira_helpers import (
  upload_files_to_jira, get_jira_projects
@@ -119,10 +120,11 @@ def check_duplicates_async(user_id, channel_id, message_ts, response_url):
 
             duplicate_list = ""
             for i, dup in enumerate(duplicates[:5]):  # Show up to 5 duplicates
+                score = trim_float(dup['combined_score'])
                 if re.match(r'^NBP-\d+$', dup['issue_key']):
-                    duplicate_list += f"• <{JIRA_ISSUE_URL}/{dup['issue_key']}|{dup['issue_key']}> - {dup['summary'][:80]}..\n"
+                    duplicate_list += f"• <{JIRA_ISSUE_URL}/{dup['issue_key']}|{dup['issue_key']} > - (*{score}%*) - {dup['summary'][:80]}..\n"
                 else:
-                    duplicate_list += f"• <{SOURCE_JIRA_ISSUE_URL}/{dup['issue_key']}|{dup['issue_key']}> - {dup['summary'][:80]}...\n"
+                    duplicate_list += f"• <{SOURCE_JIRA_ISSUE_URL}/{dup['issue_key']}|{dup['issue_key']}> - (*{score}%*) - {dup['summary'][:80]}..\n"
             analysis_message = (
                 f"*🔍 Potential Similar Issues Found*\n\n"
                 f"{duplicate_list}\n\n"
@@ -238,14 +240,15 @@ def analyze_duplicates_async(duplicates, ticket_context):
         # Extract RCA and solution from the structured response
         analysis = duplicate_analysis.get("analysis", "Unable to determine root cause.")
         solution = duplicate_analysis.get("suggested_solution", "No suggested solution available.")
-        
+        bold_analysis = replace_double_with_single_asterisks(analysis)
+        bold_solution = replace_double_with_single_asterisks(solution)
         # Format the message with better visual structure and organization
         analysis_message = (
             f"*📋 Analysis Based on Similar Issues*\n\n"
             f"*Analysis:*\n"
-            f"{analysis}\n\n"
+            f"{bold_analysis}\n\n"
             f"*Potential Solution:*\n"
-            f"{solution}\n\n"
+            f"{bold_solution}\n\n"
             f"_If you believe this is a new issue, please continue with ticket creation._"
         )
 
