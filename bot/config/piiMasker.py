@@ -2,7 +2,7 @@ from presidio_analyzer import AnalyzerEngine, RecognizerRegistry
 from presidio_analyzer.nlp_engine import NlpEngineProvider
 from presidio_anonymizer import AnonymizerEngine
 import os
-
+import stanza
 class PIIMasker:
     _instance = None
 
@@ -18,7 +18,6 @@ class PIIMasker:
 
             # Ensure Stanza is installed and model is downloaded
             try:
-                import stanza
                 # Download the English model if not already downloaded
                 if not os.path.exists(os.path.expanduser('~/stanza_resources')):
                     stanza.download('en', processors='tokenize,mwt,pos,lemma,depparse,ner')

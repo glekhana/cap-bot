@@ -10,32 +10,6 @@ import time
 import inspect
 import re
 
-# Initialize Stanza and configure it for Presidio
-def setup_analyzer_with_stanza():
-    # Download Stanza models if not already downloaded
-    if not os.path.exists(os.path.expanduser('~/stanza_resources')):
-        stanza.download('en')
-    
-    # Create configuration with Stanza
-    configuration = {
-        "nlp_engine_name": "stanza",
-        "models": [{"lang_code": "en", "model_name": "en"}]
-    }
-    
-    # Create NLP engine based on configuration
-    provider = NlpEngineProvider(nlp_configuration=configuration)
-    nlp_engine = provider.create_engine()
-    
-    # Set up analyzer with the Stanza NLP engine
-    registry = RecognizerRegistry()
-    return AnalyzerEngine(
-        registry=registry,
-        nlp_engine=nlp_engine,
-        supported_languages=["en"]
-    )
-
-# Create analyzer with Stanza
-analyzer = setup_analyzer_with_stanza()
 
 class InstanceCounterAnonymizer(Operator):
     """
@@ -357,17 +331,17 @@ def de_anonymize_pii(anonymized_text, entity_mapping):
     
     return result
 
-if __name__ == "__main__":
-    sample_text = """
-    Hi, I am John Doe. My email is john.doe@example.com and phone is 123-456-7890. My friend is Lekhana, she is cute little girl, her email is hanji@gmail.com and her phone is 91-8988888888. john smith owes me a thanks. John sarkar is my new friend.
-    """
-
-    # Anonymize text and get entity mapping
-    anonymized, entity_map = anonymize_pii(sample_text, context_aware=True)
-
-    print("Original Text:\n", sample_text)
-    print("\nAnonymized Text:\n", anonymized)
-    
-    # Deanonymize using the entity mapping
-    deanonymized = de_anonymize_pii(anonymized, entity_map)
-    print("\nDeanonymized Text:\n", deanonymized)
+# if __name__ == "__main__":
+#     sample_text = """
+#     Hi, I am John Doe. My email is john.doe@example.com and phone is 123-456-7890. My friend is Lekhana, she is cute little girl, her email is hanji@gmail.com and her phone is 91-8988888888. john smith owes me a thanks. John sarkar is my new friend.
+#     """
+#
+#     # Anonymize text and get entity mapping
+#     anonymized, entity_map = anonymize_pii(sample_text, context_aware=True)
+#
+#     print("Original Text:\n", sample_text)
+#     print("\nAnonymized Text:\n", anonymized)
+#
+#     # Deanonymize using the entity mapping
+#     deanonymized = de_anonymize_pii(anonymized, entity_map)
+#     print("\nDeanonymized Text:\n", deanonymized)
