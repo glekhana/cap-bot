@@ -1,11 +1,12 @@
 from presidio_analyzer import AnalyzerEngine, RecognizerRegistry
 from presidio_analyzer.nlp_engine import NlpEngineProvider
-from presidio_anonymizer import AnonymizerEngine, OperatorConfig
+from presidio_anonymizer import AnonymizerEngine, OperatorConfig, DeanonymizeEngine
 from presidio_anonymizer.operators import Operator, OperatorType
 from typing import Dict
 from bot.config.piiMasker import analyzer, anonymizer
 import time
 import inspect
+import re
 
 class InstanceCounterAnonymizer(Operator):
     """
@@ -53,6 +54,38 @@ class InstanceCounterAnonymizer(Operator):
     def operator_type(self) -> OperatorType:
         return OperatorType.Anonymize
 
+class InstanceCounterDeanonymizer(Operator):
+    """
+    Deanonymizer which replaces the unique identifier with the original text.
+    """
+    def operate(self, text: str, params: Dict = None) -> str:
+        """Deanonymize the input text."""
+        entity_type: str = params["entity_type"]
+        # entity_mapping is a dict of dicts containing mappings per entity type
+        entity_mapping: Dict[Dict:str] = params["entity_mapping"]
+
+        if entity_type not in entity_mapping:
+            raise ValueError(f"Entity type {entity_type} not found in entity mapping!")
+            
+        for original_value, placeholder in entity_mapping[entity_type].items():
+            if placeholder == text:
+                return original_value
+                
+        return text  # Return original if no mapping found
+
+    def validate(self, params: Dict = None) -> None:
+        """Validate operator parameters."""
+        if "entity_mapping" not in params:
+            raise ValueError("An input Dict called `entity_mapping` is required.")
+        if "entity_type" not in params:
+            raise ValueError("An entity_type param is required.")
+
+    def operator_name(self) -> str:
+        return "entity_counter_deanonymizer"
+
+    def operator_type(self) -> OperatorType:
+        return OperatorType.Deanonymize
+
 def anonymize_pii(text, entity_types=None, context_aware=True):
     """
     Anonymize PII in text using Presidio.
@@ -65,7 +98,7 @@ def anonymize_pii(text, entity_types=None, context_aware=True):
                              of the same entity type differently.
 
     Returns:
-        str: Anonymized text
+        tuple: (anonymized_text, entity_mapping) where entity_mapping can be used for deanonymization
     """
 
     start_time = time.time()
@@ -122,6 +155,7 @@ def anonymize_pii(text, entity_types=None, context_aware=True):
             analyzer_results=results,
             operators=operators
         )
+        entity_mapping = {}  # No mapping for simple anonymization
     
     end_time = time.time() - start_time
     curframe = inspect.currentframe()
@@ -129,14 +163,59 @@ def anonymize_pii(text, entity_types=None, context_aware=True):
 
     print('caller name:', calframe[1][3])
     print("--- %s conversation seconds ---" % (time.time() - start_time))
-    return anonymized_result.text
+    
+    # Return both the anonymized text and the entity mapping for potential deanonymization
+    return anonymized_result.text, entity_mapping
+
+def de_anonymize_pii(anonymized_text, entity_mapping):
+    """
+    Deanonymize text that was previously anonymized with context-aware anonymization.
+    
+    Args:
+        anonymized_text (str): The anonymized text to restore
+        entity_mapping (dict): Mapping from original values to anonymized placeholders
+                              created during anonymization
+    
+    Returns:
+        str: Deanonymized text with original values restored
+    """
+    if not entity_mapping:
+        return anonymized_text  # Nothing to deanonymize
+    
+    # Create pattern to match all entity placeholders like <ENTITY_TYPE_INDEX>
+    pattern = r"<([A-Z_]+)_(\d+)>"
+    
+    # Function to replace each matched placeholder with its original value
+    def replace_with_original(match):
+        entity_type = match.group(1)
+        placeholder = match.group(0)  # The full match: <ENTITY_TYPE_INDEX>
+        
+        if entity_type not in entity_mapping:
+            return placeholder  # Keep as is if entity type not in mapping
+        
+        # Find the original value for this placeholder
+        for original_value, mapped_placeholder in entity_mapping[entity_type].items():
+            if mapped_placeholder == placeholder:
+                return original_value
+        
+        # If no mapping found, keep the placeholder
+        return placeholder
+    
+    # Replace all placeholders with their original values
+    deanonymized_text = re.sub(pattern, replace_with_original, anonymized_text)
+    return deanonymized_text
 
 if __name__ == "__main__":
     sample_text = """
     Hi, I am John Doe. My email is john.doe@example.com and phone is 123-456-7890. My friend is Lekhana, she is cute little girl, her email is hanji@gmail.com and her phone is 91-8988888888. Lekhana owes me a thanks.
     """
 
-    anonymized = anonymize_pii(sample_text, context_aware=True)
+    # Anonymize text and get entity mapping
+    anonymized, entity_map = anonymize_pii(sample_text, context_aware=True)
 
     print("Original Text:\n", sample_text)
     print("\nAnonymized Text:\n", anonymized)
+    
+    # Deanonymize using the entity mapping
+    deanonymized = de_anonymize_pii(anonymized, entity_map)
+    print("\nDeanonymized Text:\n", deanonymized)
