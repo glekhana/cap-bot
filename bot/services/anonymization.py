@@ -2,7 +2,8 @@ from presidio_analyzer import AnalyzerEngine, RecognizerRegistry
 from presidio_analyzer.nlp_engine import NlpEngineProvider
 from presidio_anonymizer import AnonymizerEngine, OperatorConfig
 from bot.config.piiMasker import analyzer,anonymizer
-
+import time
+import inspect
 def anonymize_pii(text, entity_types=None):
     """
     Anonymize PII in text using Presidio.
@@ -16,7 +17,7 @@ def anonymize_pii(text, entity_types=None):
         str: Anonymized text
     """
 
-
+    start_time = time.time()
     # Define entity types to look for (or use default if None)
     if entity_types is None:
         entity_types = [
@@ -53,15 +54,20 @@ def anonymize_pii(text, entity_types=None):
         analyzer_results=results,
         operators=operators
     )
+    end_time = time.time() - start_time
+    curframe = inspect.currentframe()
+    calframe = inspect.getouterframes(curframe, 2)
 
+    print('caller name:', calframe[1][3])
+    print("--- %s conversation seconds ---" % (time.time() - start_time))
     return anonymized_result.text
 
-# if __name__ == "__main__":
-#     sample_text = """
-#     Hi, I am John Doe. My email is john.doe@example.com and phone is 123-456-7890.
-#     """
-#
-#     anonymized = anonymize_pii(sample_text)
-#
-#     print("Original Text:\n", sample_text)
-#     print("\nAnonymized Text:\n", anonymized)
+if __name__ == "__main__":
+    sample_text = """
+    Hi, I am John Doe. My email is john.doe@example.com and phone is 123-456-7890. My friend is Lekhana, she is cute little girl, her email is hanji@gmail.com and her phone is 91-8988888888.
+    """
+
+    anonymized = anonymize_pii(sample_text)
+
+    print("Original Text:\n", sample_text)
+    print("\nAnonymized Text:\n", anonymized)
