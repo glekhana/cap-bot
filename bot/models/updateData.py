@@ -53,13 +53,13 @@ def index_issue(issue):
             password=os.getenv("PGPASSWORD", "")
         )
         cur = conn.cursor()
-
+        summary = json.dumps(issue.get("generated_summary"))
         # Insert the issue
         cur.execute(
             """
             INSERT INTO jira_issues
                 (issue_key, summary, description, status, priority, issuetype, components,generated_summary, embedding)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
             ON CONFLICT (issue_key) DO NOTHING
             """,
             (
@@ -70,7 +70,7 @@ def index_issue(issue):
                 issue.get("priority"),
                 issue.get("issuetype"),
                 issue.get("components"),
-                issue.get("generated_summary"),
+                summary,
                 emb
             )
         )
@@ -106,8 +106,7 @@ def update_generated_summary(issue):
         update_query = """
         UPDATE jira_issues
         SET
-            generated_summary = %s,
-           
+            generated_summary = %s
         WHERE issue_key = %s;
         """
 
@@ -116,15 +115,50 @@ def update_generated_summary(issue):
 
         cur.close()
         conn.close()
-        print(f"Successfully stored issue {issue['key']}")
+        print(f"Successfully stored issue {issue['issue_key']}")
         return True
 
     except Exception as e:
-        print(f"Failed to store issue {issue['key']}: {str(e)}")
+        print(f"Failed to store issue {issue['issue_key']}: {str(e)}")
         if 'conn' in locals():
             conn.rollback()
             conn.close()
         return False
+
+
+def update_multiple_generated_summary(issues):
+    # Connect to database
+    conn = psycopg2.connect(
+        host=os.getenv("PGHOST", "localhost"),
+        port=os.getenv("PGPORT", "5452"),
+        dbname=os.getenv("PGDATABASE", "postgres"),
+        user=os.getenv("PGUSER", ""),
+        password=os.getenv("PGPASSWORD", "")
+    )
+    cur = conn.cursor()
+    for issue in issues:
+        try:
+            update_query = """
+            UPDATE jira_issues
+            SET
+                generated_summary = %s
+            WHERE issue_key = %s;
+            """
+
+            cur.execute(update_query, (json.dumps(issue["generated_summary"]), issue["issue_key"]))
+            conn.commit()
+
+
+            print(f"Successfully stored issue {issue['issue_key']}")
+        except Exception as e:
+            print(f"Failed to store issue {issue['issue_key']}: {str(e)}")
+            if 'conn' in locals():
+                conn.rollback()
+            continue
+
+    cur.close()
+    conn.close()
+
 
 def update_all_issue_data(issue):
     # Constants

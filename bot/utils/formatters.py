@@ -83,9 +83,9 @@ def extract_text_from_nodes(nodes):
             extracted_text += '\n'
             
     return extracted_text
-def trim_float(value, decimals=3):
+def trim_float(value, decimals=1):
     percent = value * 100
-    return f"{percent:.{decimals}f}%"
+    return f"{percent:.{decimals}f}"
 
 
 def replace_double_with_single_asterisks(text):

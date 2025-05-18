@@ -126,6 +126,7 @@ def create_thread_to_ticket_async(client,user_id, channel_id, message_ts, respon
                     "description": adf_doc,
                     "priority": {"name": priority},
                     "labels": labels,
+                    #"customfield_10072":[{"name": "Shell"}],
                   #  "components":[{"name": components}],
                     "issuetype": {"name": "Bug"},
                     "customfield_10039":message_ts,

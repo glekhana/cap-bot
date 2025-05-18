@@ -183,7 +183,7 @@ def anonymize_pii(text, entity_types=None, context_aware=True):
         entity_types = [
             "PERSON", "EMAIL_ADDRESS", "PHONE_NUMBER",
             "CREDIT_CARD", "US_SSN", "US_PASSPORT",
-            "LOCATION", "IP_ADDRESS", "URL", "DOMAIN_NAME"
+            "LOCATION", "IP_ADDRESS", "DOMAIN_NAME"
         ]
 
     # Pre-process text to normalize case variations of names
@@ -234,7 +234,6 @@ def anonymize_pii(text, entity_types=None, context_aware=True):
             "US_PASSPORT": OperatorConfig("replace", {"new_value": "<PASSPORT>"}),
             "LOCATION": OperatorConfig("replace", {"new_value": "<LOCATION>"}),
             "IP_ADDRESS": OperatorConfig("replace", {"new_value": "<IP>"}),
-            "URL": OperatorConfig("replace", {"new_value": "<URL>"}),
             "DOMAIN_NAME": OperatorConfig("replace", {"new_value": "<DOMAIN>"}),
         }
 
@@ -250,8 +249,8 @@ def anonymize_pii(text, entity_types=None, context_aware=True):
     curframe = inspect.currentframe()
     calframe = inspect.getouterframes(curframe, 2)
 
-    print('caller name:', calframe[1][3])
-    print("--- %s conversation seconds ---" % (time.time() - start_time))
+    #print('caller name:', calframe[1][3])
+    #print("--- %s conversation seconds ---" % (time.time() - start_time))
     
     # Return both the anonymized text and the entity mapping for potential deanonymization
     return anonymized_result.text, entity_mapping

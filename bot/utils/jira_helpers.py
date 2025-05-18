@@ -162,8 +162,8 @@ def get_jira_projects():
     """
     # Hardcoded list of target projects only
     projects = [
-        {'key': 'NBP', 'name': 'NBP - Incentives Platform', 'id': 'NBP'},
-        {'key': 'IT', 'name': 'IT - Integrations', 'id': 'IT'},
+        {'key': 'NBP', 'name': 'NBP (demo:read from CP)', 'id': 'NBP'},
+        {'key': 'CP', 'name': 'CP - CP', 'id': 'CP'},
         {'key': 'DEV', 'name': 'DEV - Development', 'id': 'DEV'},
         {'key': 'TEST', 'name': 'TEST - Testing', 'id': 'TEST'},
         {'key': 'HELP', 'name': 'HELP - Help Desk', 'id': 'HELP'}

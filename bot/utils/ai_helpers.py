@@ -4,51 +4,21 @@ Helper functions for interacting with AI services (e.g., OpenAI).
 import openai
 from openai import OpenAI
 from bot.config.settings import OPENAI_API_KEY
-import json
-
-from bot.services.anonymization import anonymize_pii
+import json,time
+import threading
+from bot.models.updateData import update_generated_summary, update_multiple_generated_summary
+from bot.services.anonymization import anonymize_pii, de_anonymize_pii
 from bot.utils.formatters import format_comments
-from bot.utils.jira_helpers import extract_comments_from_duplicates
+from bot.utils.jira_helpers import extract_comments_from_duplicates, get_issue_comments
 
 # Initialize OpenAI client
 client = OpenAI(api_key=OPENAI_API_KEY)
 
-# def generate_ticket_title(conversation_text):
-#     """
-#     Generate a concise title for a ticket based on a Slack conversation.
-    
-#     Args:
-#         conversation_text: The Slack conversation text
-        
-#     Returns:
-#         A string containing the generated title
-#     """
-#     try:
-#         response = client.chat.completions.create(
-#             model="gpt-3.5-turbo",
-#             messages=[
-#                 {"role": "system", "content": "You are a helpful assistant that generates title for a bug from a slack conversation about it. The title is directly added to a Jira ticket."},
-#                 {"role": "user", "content": f"Create a short, descriptive title for a JIRA ticket based on this Slack conversation:\n\n{conversation_text}. Output only the title and no pre or post text."}
-#             ],
-#             max_tokens=60,
-#             temperature=0.3
-#         )
-        
-#         title = response.choices[0].message.content.strip()
-        
-#         # Limit title length to 75 characters
-#         if len(title) > 75:
-#             title = title[:71] + "..."
-            
-#         return title
-        
-#     except Exception as e:
-#         print(f"Error generating title: {e}")
-#         return "Slack Thread Discussion"
-
 
 def generate_from_thread_ticket_parameters(conversation_text):
-    anonymized_conversation_text = anonymize_pii(conversation_text)
+
+    anonymized_conversation_text,mappings = anonymize_pii(conversation_text)
+
     """
     Generate a concise title for a ticket based on a Slack conversation.
 
@@ -78,6 +48,8 @@ def generate_from_thread_ticket_parameters(conversation_text):
           "priority": "<Lowest | Low | Medium | High | Highest>"
         }}
 """
+    print("----------Anonymzed Conversation-------")
+    print(anonymized_conversation_text)
     try:
         response = client.chat.completions.create(
             model="gpt-3.5-turbo",
@@ -91,6 +63,9 @@ def generate_from_thread_ticket_parameters(conversation_text):
         )
 
         result = response.choices[0].message.content.strip()
+        result = de_anonymize_pii(result,mappings)
+        print("----------De Anonymzed Summary-------")
+        print(result)
         try:
             result = json.loads(result)
         except json.JSONDecodeError:
@@ -135,13 +110,14 @@ def generate_summary_from_ticket(title,description,comments_text="None for now")
           "resolution_summary": "<detailed resolution summary or 'Not available' if not found>"
         }}
         """
+        anonymized_prompt,mappings = anonymize_pii(prompt)
 
         response = client.chat.completions.create(
             model="gpt-3.5-turbo-16k",  # Using larger context model to handle more text
             messages=[
                 {"role": "system",
                  "content": "You are an expert technical analyst who extracts comprehensive information from JIRA tickets."},
-                {"role": "user", "content": prompt}
+                {"role": "user", "content": anonymized_prompt}
             ],
             response_format={"type": "json_object"},
             temperature=0.3,
@@ -149,9 +125,9 @@ def generate_summary_from_ticket(title,description,comments_text="None for now")
         )
 
         result = response.choices[0].message.content.strip()
-
+        final_result = de_anonymize_pii(result,mappings)
         try:
-            result = json.loads(result)
+            result = json.loads(final_result)
 
         except json.JSONDecodeError:
             raise ValueError(f"Could not parse response: {result}")
@@ -166,74 +142,6 @@ def generate_summary_from_ticket(title,description,comments_text="None for now")
         }
 
 
-# def suggest_priority(conversation_text):
-#     """
-#     Suggest a priority level based on a Slack conversation.
-    
-#     Args:
-#         conversation_text: The Slack conversation text
-        
-#     Returns:
-#         A string containing the suggested priority (Lowest, Low, Medium, High, Highest)
-#     """
-#     try:
-#         response = client.chat.completions.create(
-#             model="gpt-3.5-turbo",
-#             messages=[
-#                 {"role": "system", "content": "You are a helpful assistant that generates priority for a bug from a slack conversation about it. Based on the conversation, you'll assign one of these priority levels: 'Lowest', 'Low', 'Medium', 'High', or 'Highest'."},
-#                 {"role": "user", "content": f"Based on this Slack conversation, determine the appropriate priority level for a JIRA ticket. Return exactly one of these options: 'Lowest', 'Low', 'Medium', 'High', or 'Highest'.\n\n{conversation_text}"}
-#             ],
-#             max_tokens=20,
-#             temperature=0.3
-#         )
-        
-#         priority_text = response.choices[0].message.content.strip()
-        
-#         # Extract valid priority
-#         valid_priorities = ["Lowest", "Low", "Medium", "High", "Highest"]
-#         if not any(p.lower() in priority_text.lower() for p in valid_priorities):
-#             return "Medium"  # Default
-            
-#         # Find which priority was mentioned
-#         for p in valid_priorities:
-#             if p.lower() in priority_text.lower():
-#                 return p
-                
-#         return "Medium"  # Default fallback
-        
-#     except Exception as e:
-#         print(f"Error suggesting priority: {e}")
-#         return "Medium"
-
-# def generate_ticket_summary(conversation_text):
-#     """
-#     Generate a detailed summary for a ticket based on a Slack conversation.
-    
-#     Args:
-#         conversation_text: The Slack conversation text
-        
-#     Returns:
-#         A string containing the generated summary
-#     """
-#     try:
-#         response = client.chat.completions.create(
-#             model="gpt-3.5-turbo",
-#             messages=[
-#                 {"role": "system", "content": "You are a helpful assistant that generates description for a bug from a slack conversation about it. The description is directly added to a Jira ticket."},
-#                 {"role": "user", "content": f"Generate a JIRA ticket description for a bug from the following slack conversation:\n\n{conversation_text}. Be as descriptive as possible. Preserve the major keywords"}
-#             ],
-#             max_tokens=500,
-#             temperature=0.3
-#         )
-        
-#         return response.choices[0].message.content.strip()
-        
-#     except Exception as e:
-#         print(f"Error generating summary: {e}")
-#         return "No automated summary available. Please refer to the original Slack thread for details."
-
-
-
 def analyze_duplicate_issues(duplicates):
     """
     Analyze each duplicate issue and extract comprehensive information.
@@ -244,30 +152,39 @@ def analyze_duplicate_issues(duplicates):
     Returns:
         A list of dictionaries with detailed analysis of each duplicate
     """
+
+
     analyzed_duplicates = []
 
     # Extract all comments from duplicates
-    comments_by_ticket = extract_comments_from_duplicates(duplicates)
+    start_time = time.time()
 
+
+    save_to_db = []
     for dup in duplicates:
         ticket_key = dup.get('issue_key', '')
-        # Get all comments for this ticket
-        ticket_comments = comments_by_ticket.get(ticket_key, [])
 
         try:
             if dup['generated_summary'] is  None:
-                result = summarize_for_individual_issue(dup, ticket_comments)
+                comments = get_issue_comments(ticket_key)
+                result = summarize_for_individual_issue(dup, comments)
                 try:
                     analysis = json.loads(result)
+                    issue = {
+                        "generated_summary": analysis,
+                        "issue_key": ticket_key
+                    }
+                    save_to_db.append(issue)
                     analysis["issue_key"] = ticket_key
-                    analysis["comments"] = ticket_comments
+
                     analysis["original_summary"] = dup.get("summary", "")
+                    save_to_db.append(analysis)
+
                 except json.JSONDecodeError:
                     raise ValueError(f"Could not parse response: {result}")
             else:
-                analysis = dup['generated_summary']
+                analysis=dup['generated_summary']
                 analysis["issue_key"] = ticket_key
-                analysis["comments"] = ticket_comments
                 analysis["original_summary"] = dup.get("summary", "")
             analyzed_duplicates.append(analysis)
 
@@ -277,12 +194,18 @@ def analyze_duplicate_issues(duplicates):
             analyzed_duplicates.append({
                 "key": dup.get("issue_key", ""),
                 "original_summary": dup.get("summary", ""),
-                "comments":ticket_comments,
                 "issue_summary": "Analysis failed",
                 "rca_summary": "Not available",
                 "resolution_summary": "Not available"
             })
-
+            continue
+    if save_to_db is not None:
+        thread = threading.Thread(
+            target=update_multiple_generated_summary,
+            args=(save_to_db,)
+        )
+        thread.daemon = True
+        thread.start()
     return analyzed_duplicates
 
 def summarize_duplicate_issues(title, summary, description, duplicates):
@@ -311,30 +234,25 @@ def summarize_duplicate_issues(title, summary, description, duplicates):
         # Format duplicates with their full analysis
         duplicates_text = ""
         for i, dup in enumerate(analyzed_duplicates):  # Include all analyzed duplicates
-            comments_text = format_comments(dup["comments"])
+
             duplicates_text += f"Key: {dup['issue_key']}\n"
             duplicates_text += f"   Title: {dup['original_summary']}\n"
-            duplicates_text += f"   Comments in ticket : {comments_text}\n\n"
+            #duplicates_text += f"   Comments in ticket : {comments_text}\n\n"
             duplicates_text += f"   Issue Summary: {dup['issue_summary']}\n"
             duplicates_text += f"   Root Cause: {dup['rca_summary']}\n"
             duplicates_text += f"   Resolution: {dup['resolution_summary']}\n\n"
             duplicates_text += f"--------------------------------------\n\n\n"
 
-        anonymized_description = anonymize_pii(description)
-        anonymized_duplicates_text = anonymize_pii(duplicates_text)
-
-        # Extract all comments from duplicates
-
         # Create master prompt with all available information
-        prompt = f"""You are given a new issue along with a list of similar past issues, including their complete descriptions and full comment threads.
+        prompt = f"""You are given a new issue along with a list of similar past issues, including their complete descriptions.
 
         New Issue:
         Title: {title}
         Summary: {summary}
-        Description: {anonymized_description}
+        Description: {description}
 
         Similar Past Issues (with full details and resolutions):
-        {anonymized_duplicates_text}
+        {duplicates_text}
 
         Your task is to perform a comprehensive duplicate analysis and recommend a solution.
 
@@ -361,13 +279,14 @@ def summarize_duplicate_issues(title, summary, description, duplicates):
         }}
         """
 
-        print(prompt)
+
+        anonymized_prompt,mappings = anonymize_pii(prompt)
 
         response = client.chat.completions.create(
             model="gpt-4.1-mini-2025-04-14", # o4-mini-2025-04-16  # Using larger context model
             messages=[
                 {"role": "system", "content": "You are a senior technical analyst specializing in identifying duplicate issues by analyzing current and historical tickets. Your job is to examine new issues in detail, compare them against a set of similar past issues (including their full descriptions and comments), and provide a precise analysis of how they are related. You must also derive a comprehensive solution for the new issue based on how previous issues were resolved. Be exhaustive, use issue keys in your analysis, and structure your output clearly in the requested JSON format."},
-                {"role": "user", "content": prompt}
+                {"role": "user", "content": anonymized_prompt}
             ],
             response_format={"type": "json_object"},
             # temperature=0.3,
@@ -375,6 +294,7 @@ def summarize_duplicate_issues(title, summary, description, duplicates):
         )
 
         result = response.choices[0].message.content.strip()
+        result = de_anonymize_pii(result,mappings)
         try:
             analysis = json.loads(result)
             return analysis
@@ -393,8 +313,7 @@ def summarize_for_individual_issue(dup,ticket_comments):
 
     # Include full comments in the prompt
     comments_text = format_comments(ticket_comments)
-    anonymized_comments = anonymize_pii(comments_text)
-    anonymized_description = anonymize_pii(description)
+
 
     prompt = f"""
     You are an expert analyst examining JIRA tickets. Based on the complete ticket information below, extract:
@@ -411,10 +330,10 @@ def summarize_for_individual_issue(dup,ticket_comments):
 
     Description:
     \"\"\"
-    {anonymized_description}
+    {description}
     \"\"\"
 
-    {anonymized_comments}
+    {comments_text}
 
     Respond only in this JSON format:
 
@@ -424,13 +343,13 @@ def summarize_for_individual_issue(dup,ticket_comments):
       "resolution_summary": "<detailed resolution summary or 'Not available' if not found>"
     }}
     """
-
+    anonymize_prompt,mappings = anonymize_pii(prompt)
     response = client.chat.completions.create(
         model="gpt-3.5-turbo-16k",  # Using larger context model to handle more text
         messages=[
             {"role": "system",
              "content": "You are an expert technical analyst who extracts comprehensive information from JIRA tickets."},
-            {"role": "user", "content": prompt}
+            {"role": "user", "content": anonymize_prompt}
         ],
         response_format={"type": "json_object"},
         temperature=0.3,
@@ -438,4 +357,5 @@ def summarize_for_individual_issue(dup,ticket_comments):
     )
 
     result = response.choices[0].message.content.strip()
-    return result
+
+    return de_anonymize_pii(result,mappings)

@@ -2,6 +2,8 @@
 Handlers for JIRA ticket creation from Slack conversations.
 """
 import json
+import threading
+
 from slack_sdk import WebClient
 import requests
 import re
@@ -87,7 +89,7 @@ def check_duplicates_async(user_id, channel_id, message_ts, response_url):
             if msg.get("bot_id") and msg.get("username") and "cap" in msg.get("username", "").lower():
                 continue
 
-            conversation_text = "\n".join(f"{msg.get('username', 'User')}: {msg.get('text', '')}")
+            conversation_text += f"{username}: {msg.get('text', '')}\n"
 
         # Get title and suggested priority, but don't generate summary yet
         result = generate_from_thread_ticket_parameters(conversation_text)
@@ -213,7 +215,7 @@ def analyze_duplicates_async(duplicates, ticket_context):
         summary = ticket_context["summary"]
 
         # Generate AI analysis of potential duplicates
-        duplicate_analysis = summarize_duplicate_issues(title, summary, conversation_text, duplicates)
+        duplicate_analysis= summarize_duplicate_issues(title, summary, conversation_text, duplicates)
 
         # Format duplicate list for display in Slack - keep this part as is
         duplicate_list = ""
