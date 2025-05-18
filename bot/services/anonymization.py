@@ -330,17 +330,17 @@ def de_anonymize_pii(anonymized_text, entity_mapping):
     
     return result
 
-# if __name__ == "__main__":
-#     sample_text = """
-#     Hi, I am John Doe. My email is john.doe@example.com and phone is 123-456-7890. My friend is Lekhana, she is cute little girl, her email is hanji@gmail.com and her phone is 91-8988888888. john smith owes me a thanks. John sarkar is my new friend.
-#     """
-#
-#     # Anonymize text and get entity mapping
-#     anonymized, entity_map = anonymize_pii(sample_text, context_aware=True)
-#
-#     print("Original Text:\n", sample_text)
-#     print("\nAnonymized Text:\n", anonymized)
-#
-#     # Deanonymize using the entity mapping
-#     deanonymized = de_anonymize_pii(anonymized, entity_map)
-#     print("\nDeanonymized Text:\n", deanonymized)
+if __name__ == "__main__":
+    sample_text = """
+    Hi, I’m Alice Johnson. You can reach me at alice.j@example.com. My colleague Bob Lee’s email is bob.lee@workmail.com and his phone is +1-800-555-9876. Alice and Bob are working on the same project. Also, Charlie phone number is (123) 456-7890, and his email is charlie@domain.com.
+    """
+
+    # Anonymize text and get entity mapping
+    anonymized, entity_map = anonymize_pii(sample_text, context_aware=True)
+
+    print("Original Text:\n", sample_text)
+    print("\nAnonymized Text:\n", anonymized)
+
+    # Deanonymize using the entity mapping
+    deanonymized = de_anonymize_pii(anonymized, entity_map)
+    print("\nDeanonymized Text:\n", deanonymized)
